@@ -1,0 +1,1020 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="한글(.hwpx) 보고서를 휴대폰에서 한글 프로그램과 같은 줄 배치로 보는 뷰어">
+<meta name="theme-color" content="#FAFBFD" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161B25" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HWPX 뷰어">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>HWPX 보고서 뷰어</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+  /* 배치: 책상 위에 쪽을 차례로 펼친다. 도구는 위쪽 띠와 아래쪽 손잡이에만 둔다. */
+  :root {
+    --desk: #E4E8EF;
+    --surface: #FAFBFD;
+    --surface-2: #EEF1F6;
+    --ink: #151C2A;
+    --muted: #5A6375;
+    --line: #D1D7E1;
+    --accent: #1F3A8A;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #E1E8F8;
+    --band: #0A33A9;
+    --warn: #8A5300;
+    --scrim: rgba(12, 17, 28, 0.42);
+    --paper-edge: rgba(18, 27, 46, 0.14);
+    --paper-shadow: 0 1px 2px rgba(18, 27, 46, 0.10), 0 8px 24px rgba(18, 27, 46, 0.10);
+    --font-ui: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+    --font-doc: 'HwpxViewer Myeongjo', 'Noto Serif CJK KR', serif;
+    --radius: 10px;
+    --bar-h: 52px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --desk: #0E121A;
+      --surface: #161B25;
+      --surface-2: #1E2532;
+      --ink: #E6E9F0;
+      --muted: #9AA3B5;
+      --line: #2A3242;
+      --accent: #9DB3F4;
+      --accent-ink: #0D1426;
+      --accent-soft: #212E4D;
+      --band: #6D8BEA;
+      --warn: #E2B45C;
+      --scrim: rgba(0, 0, 0, 0.55);
+      --paper-edge: rgba(0, 0, 0, 0.5);
+      --paper-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px rgba(0, 0, 0, 0.45);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --desk: #0E121A;
+    --surface: #161B25;
+    --surface-2: #1E2532;
+    --ink: #E6E9F0;
+    --muted: #9AA3B5;
+    --line: #2A3242;
+    --accent: #9DB3F4;
+    --accent-ink: #0D1426;
+    --accent-soft: #212E4D;
+    --band: #6D8BEA;
+    --warn: #E2B45C;
+    --scrim: rgba(0, 0, 0, 0.55);
+    --paper-edge: rgba(0, 0, 0, 0.5);
+    --paper-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px rgba(0, 0, 0, 0.45);
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--desk);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    -webkit-text-size-adjust: 100%;
+    overflow: hidden;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0 0 auto;
+    height: env(safe-area-inset-top, 0px);
+    z-index: 10;
+    background: var(--surface);
+  }
+  button { font: inherit; color: inherit; }
+  .app { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+
+  /* 위쪽 띠 */
+  .bar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--bar-h);
+    padding-block: 6px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .mark { flex: none; width: 26px; height: 32px; display: block; }
+  .doc-name {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .doc-name strong {
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .doc-name span {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+  .tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    vertical-align: 1px;
+  }
+  .btn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    cursor: pointer;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface-2); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { filter: brightness(1.08); background: var(--accent); }
+  .btn svg { width: 18px; height: 18px; }
+  .icon-btn {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    display: inline-grid;
+    place-items: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    color: var(--ink);
+  }
+  .icon-btn:hover { background: var(--surface-2); }
+  .icon-btn svg { width: 20px; height: 20px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* 쪽이 놓이는 책상 */
+  .viewer {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  .stage {
+    width: max-content;
+    min-width: 100%;
+    box-sizing: border-box;
+    padding: 16px max(16px, env(safe-area-inset-right, 0px)) 112px max(16px, env(safe-area-inset-left, 0px));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    transform-origin: 0 0;
+  }
+  .page {
+    position: relative;
+    background: #FFFFFF;
+    box-shadow: var(--paper-shadow);
+    outline: 1px solid var(--paper-edge);
+    flex: none;
+  }
+  .page svg { display: block; width: 100%; height: 100%; }
+  .page text { -webkit-user-select: text; user-select: text; }
+
+  .notice {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .notice p { margin: 0; flex: 1 1 220px; min-width: 0; }
+  .notice b { color: var(--ink); font-weight: 600; }
+
+  .state-card {
+    max-width: 420px;
+    margin: 12vh auto 0;
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    text-align: left;
+    display: grid;
+    gap: 12px;
+  }
+  .state-card h2 { margin: 0; font-size: 17px; font-weight: 600; text-wrap: balance; }
+  .state-card p { margin: 0; color: var(--muted); line-height: 1.6; }
+  .state-card .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .loading { margin: 18vh auto 0; color: var(--muted); font-size: 14px; display: flex; align-items: center; gap: 10px; justify-content: center; }
+  .loading i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 아래쪽 손잡이 */
+  .dock {
+    position: fixed;
+    left: 50%;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: 0 6px 22px rgba(10, 16, 30, 0.16);
+    max-width: calc(100vw - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  }
+  .dock .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+  .zoom-label {
+    min-width: 56px;
+    height: 40px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    font-size: 13px;
+  }
+  .zoom-label:hover { background: var(--surface-2); }
+  .dock .label { font-size: 12px; margin-left: 2px; }
+  @media (max-width: 380px) { .dock .label { display: none; } }
+
+  /* 아래에서 올라오는 판 */
+  .scrim { position: fixed; inset: 0; z-index: 20; background: var(--scrim); }
+  .sheet {
+    position: fixed;
+    z-index: 21;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
+    width: min(560px, 100%);
+    max-height: min(78vh, 680px);
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 40px rgba(10, 16, 30, 0.2);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: rise 0.18s ease-out;
+  }
+  @keyframes rise { from { transform: translate(-50%, 24px); opacity: 0.4; } to { transform: translate(-50%, 0); opacity: 1; } }
+  .sheet header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 8px 8px max(18px, env(safe-area-inset-left, 0px));
+    border-bottom: 1px solid var(--line);
+  }
+  .sheet h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; }
+  .sheet .body {
+    overflow: auto;
+    padding: 12px max(18px, env(safe-area-inset-right, 0px)) 18px max(18px, env(safe-area-inset-left, 0px));
+    display: grid;
+    gap: 16px;
+    min-height: 0;
+  }
+  .sheet h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .list button {
+    width: 100%;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    line-height: 1.45;
+  }
+  .list button:hover { background: var(--surface-2); }
+  .list .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .list .n { flex: none; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .toc .lv0 .t { font-weight: 600; }
+  .toc .lv1 { padding-left: 14px; }
+  .toc .lv2 { padding-left: 28px; }
+  .doc-row { display: flex; align-items: center; gap: 4px; }
+  .doc-row > button:first-child { flex: 1; min-width: 0; }
+  .list .doc-row .icon-btn { flex: none; width: 40px; height: 40px; padding: 0; display: inline-grid; place-items: center; }
+  .doc-row .meta { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); font-size: 13px; line-height: 1.6; margin: 0; padding: 4px 2px; }
+  dl.facts { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 13px; }
+  dl.facts dt { color: var(--muted); }
+  dl.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  .fonts { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .fonts td { padding: 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .fonts td:first-child { padding-right: 12px; }
+  .fonts td:last-child { color: var(--muted); }
+  .fonts .arrow { color: var(--muted); padding: 6px 8px; }
+  .note { margin: 0; font-size: 13px; line-height: 1.65; color: var(--muted); }
+  .warn { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: var(--warn); }
+  .drop {
+    position: fixed;
+    inset: 12px;
+    z-index: 30;
+    display: grid;
+    place-items: center;
+    border: 2px dashed var(--accent);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--accent);
+    pointer-events: none;
+  }
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 25;
+    max-width: calc(100vw - 48px);
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--ink);
+    color: var(--surface);
+    font-size: 13px;
+    line-height: 1.5;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sheet { animation: none; }
+    .loading i { animation: none; }
+  }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* 설치형 앱: 상태 표시줄 아래에서 시작하고, 설치 안내 띠를 위쪽 띠 밑에 둔다 */
+  .app { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); }
+  .install {
+    display: flex;
+    align-items: center;
+    gap: 8px 12px;
+    flex-wrap: wrap;
+    padding-block: 10px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    background: var(--accent-soft);
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .install p { margin: 0; flex: 1 1 220px; min-width: 0; }
+  .install .row { display: flex; gap: 6px; margin-left: auto; }
+  .install .btn { height: 34px; padding: 0 12px; }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="bar">
+    <svg class="mark" viewBox="0 0 26 32" aria-hidden="true">
+      <rect x="0.5" y="0.5" width="25" height="31" rx="2" fill="#FFFFFF" stroke="var(--line)"/>
+      <rect x="4" y="6" width="18" height="2.4" fill="var(--band)"/>
+      <rect x="6" y="10.4" width="14" height="2.2" rx="0.6" fill="#1B2232"/>
+      <rect x="4" y="14.6" width="18" height="2.4" fill="var(--band)"/>
+      <rect x="5" y="20.5" width="16" height="1.3" rx="0.6" fill="#9AA3B5"/>
+      <rect x="5" y="23.6" width="12" height="1.3" rx="0.6" fill="#9AA3B5"/>
+      <rect x="5" y="26.7" width="14" height="1.3" rx="0.6" fill="#9AA3B5"/>
+    </svg>
+    <div class="doc-name">
+      <strong id="docTitle">HWPX 보고서 뷰어</strong>
+      <span id="docSub">한글 보고서를 한글과 같은 줄 배치로 봅니다</span>
+    </div>
+    <button class="icon-btn" id="infoBtn" type="button" aria-label="문서 정보">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
+    </button>
+    <button class="btn primary" id="openBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5V18a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 18v-8a1.5 1.5 0 0 0-1.5-1.5H12L10 6H5.5A1.5 1.5 0 0 0 4 7.5Z"/></svg>
+      열기
+    </button>
+    <input type="file" id="fileInput" class="sr-only" tabindex="-1" aria-hidden="true">
+  </header>
+
+  <div class="install" id="install" role="region" aria-label="앱 설치 안내" hidden></div>
+
+  <main class="viewer" id="viewer" aria-live="polite">
+    <div class="stage" id="stage"></div>
+  </main>
+
+  <nav class="dock" id="dock" aria-label="보기 도구">
+    <button class="icon-btn" id="tocBtn" type="button" aria-label="목차">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.6" cy="6.5" r="1.1" fill="currentColor"/><circle cx="4.6" cy="12" r="1.1" fill="currentColor"/><circle cx="4.6" cy="17.5" r="1.1" fill="currentColor"/></svg>
+    </button>
+    <span class="sep" aria-hidden="true"></span>
+    <button class="icon-btn" id="zoomOut" type="button" aria-label="작게">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 12h12"/></svg>
+    </button>
+    <button class="zoom-label" id="zoomFit" type="button" aria-label="화면 폭에 맞추기">맞춤</button>
+    <button class="icon-btn" id="zoomIn" type="button" aria-label="크게">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg>
+    </button>
+    <span class="sep" aria-hidden="true"></span>
+    <button class="icon-btn" id="libBtn" type="button" aria-label="문서함">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h4l2 2.2h7A1.5 1.5 0 0 1 20 8.7V17.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z"/><path d="M4 10h16"/></svg>
+    </button>
+  </nav>
+</div>
+
+<div id="overlay"></div>
+
+<script src="jszip.min.js"></script>
+<script src="metrics.js"></script>
+<script>window.HWPX_FONTS = {"serif": "'HwpxViewer Myeongjo', 'Noto Serif CJK KR', 'AppleMyungjo', 'Batang', serif", "gothic": "'HwpxViewer Gothic', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif", "sans": "'Noto Sans KR', 'HwpxViewer Gothic', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif"};</script>
+<script src="engine.js"></script>
+<script src="pwa.js"></script>
+<script>
+(function () {
+  'use strict';
+  const SAMPLE_REVIEW = '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';
+  const SAMPLES = [
+    { id: 'sample-review', name: '회의실 대관 운영 개선 검토(예시).hwpx', kind: '검토 보고서', inline: SAMPLE_REVIEW },
+    { id: 'sample-event', name: '제○회 의정 간담회 개최 보고(예시).hwpx', kind: '행사 보고서(의장 요약보고용)', url: 'samples/event.json' },
+  ];
+  const FONT_NAMES = {
+    'Nanum Myeongjo': '뷰어 명조(나눔명조 바탕)', 'Nanum Gothic': '뷰어 고딕(나눔고딕 바탕)', 'Noto Sans KR': '본고딕(Noto Sans KR)',
+    'Noto Sans KR Medium': '본고딕 중간 굵기', 'Noto Sans KR ExtraBold': '본고딕 아주 굵게', monospace: '고정폭 글꼴',
+  };
+  const ZOOMS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 2.5, 3, 4];
+  const MAX_ZOOM = 4, MIN_ZOOM = 0.4;
+
+  const $ = (id) => document.getElementById(id);
+  const viewer = $('viewer'), stage = $('stage'), overlay = $('overlay');
+  const state = { doc: null, pkg: null, urls: [], zoom: 1, fitW: 600, maxW: 1, name: '', sample: null, current: 0, pages: [], busy: false };
+
+  // ------------------------------------------------------------------ 저장(이 기기 브라우저에만)
+  const store = (() => {
+    let dbp = null;
+    const open = () => {
+      if (dbp) return dbp;
+      dbp = new Promise((resolve) => {
+        try {
+          const req = indexedDB.open('hwpx-viewer', 1);
+          req.onupgradeneeded = () => { try { req.result.createObjectStore('docs', { keyPath: 'id' }); } catch (e) { /* 이미 있음 */ } };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => resolve(null);
+          req.onblocked = () => resolve(null);
+        } catch (e) { resolve(null); }
+      });
+      return dbp;
+    };
+    const tx = async (mode, fn) => {
+      const db = await open();
+      if (!db) return null;
+      return new Promise((resolve) => {
+        try {
+          const t = db.transaction('docs', mode);
+          const s = t.objectStore('docs');
+          const out = fn(s);
+          t.oncomplete = () => resolve(out && 'result' in out ? out.result : true);
+          t.onerror = () => resolve(null);
+          t.onabort = () => resolve(null);
+        } catch (e) { resolve(null); }
+      });
+    };
+    return {
+      async list() {
+        const all = await tx('readonly', (s) => s.getAll());
+        return Array.isArray(all) ? all.sort((a, b) => b.openedAt - a.openedAt) : [];
+      },
+      async get(id) { return tx('readonly', (s) => s.get(id)); },
+      async put(rec) {
+        await tx('readwrite', (s) => s.put(rec));
+        const all = await this.list();
+        for (const old of all.slice(12)) await this.remove(old.id);
+      },
+      async remove(id) { return tx('readwrite', (s) => s.delete(id)); },
+    };
+  })();
+  const prefs = {
+    get(k) { try { return localStorage.getItem('hwpx-viewer:' + k); } catch (e) { return null; } },
+    set(k, v) { try { if (v === null) localStorage.removeItem('hwpx-viewer:' + k); else localStorage.setItem('hwpx-viewer:' + k, v); } catch (e) { /* 저장 안 됨 */ } },
+  };
+
+  // ------------------------------------------------------------------ 문서 열기
+  function b64ToBuffer(b64) {
+    const bin = atob(b64);
+    const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return u.buffer;
+  }
+  async function hashOf(buf) {
+    try {
+      const d = await crypto.subtle.digest('SHA-256', buf);
+      return Array.from(new Uint8Array(d).slice(0, 10)).map((b) => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) { return String(buf.byteLength) + '-' + Date.now(); }
+  }
+  function sizeText(n) {
+    if (n < 1024) return n + 'B';
+    if (n < 1024 * 1024) return Math.round(n / 1024) + 'KB';
+    return (n / 1024 / 1024).toFixed(1) + 'MB';
+  }
+  function dateText(t) {
+    const d = new Date(t);
+    const now = new Date();
+    const same = d.toDateString() === now.toDateString();
+    const p = (x) => String(x).padStart(2, '0');
+    return same ? `오늘 ${p(d.getHours())}:${p(d.getMinutes())}` : `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`;
+  }
+
+  function showLoading(name) {
+    stage.innerHTML = `<div class="loading"><i aria-hidden="true"></i><span>${esc(name)} 쪽을 배치하는 중</span></div>`;
+  }
+  function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+  async function openBuffer(buf, meta) {
+    // 배치 중에 다른 문서가 들어오면(공유받은 파일 등) 지금 것이 끝난 뒤 이어서 연다
+    if (state.busy) { state.pending = [buf, meta]; return; }
+    state.busy = true;
+    showLoading(meta.name);
+    await new Promise((r) => setTimeout(r, 30));
+    try {
+      const pkg = await HwpxEngine.readPackage(buf);
+      const doc = HwpxEngine.layoutDocument(pkg);
+      for (const u of state.urls) URL.revokeObjectURL(u);
+      state.urls = [];
+      state.pkg = pkg; state.doc = doc; state.name = meta.name; state.sample = meta.sample || null;
+      setTitle();
+      renderDoc();
+      viewer.scrollTop = 0; viewer.scrollLeft = 0;
+      if (!meta.sample) {
+        const id = meta.id || (await hashOf(buf));
+        await store.put({ id, name: meta.name, size: buf.byteLength, openedAt: Date.now(), pages: doc.pages.length, data: buf });
+        prefs.set('last', id);
+      } else prefs.set('last', meta.sample);
+    } catch (err) {
+      showError(err, meta.name);
+    } finally {
+      state.busy = false;
+      if (state.pending) { const next = state.pending; state.pending = null; openBuffer(next[0], next[1]); }
+    }
+  }
+  function setTitle() {
+    const doc = state.doc;
+    const title = state.name.replace(/\.hwpx$/i, '');
+    $('docTitle').innerHTML = esc(title) + (state.sample ? '<span class="tag">예시</span>' : '');
+    document.title = title + ' - HWPX 보고서 뷰어';
+    updateSub();
+    void doc;
+  }
+  function updateSub() {
+    const doc = state.doc;
+    if (!doc) return;
+    const p = doc.pages[0];
+    const paper = p ? paperName(p.section) : '';
+    $('docSub').textContent = `${state.current + 1} / ${doc.pages.length}쪽 · ${paper}`;
+  }
+  function paperName(S) {
+    const mm = (v) => Math.round(v / 7200 * 25.4);
+    const w = mm(S.width), h = mm(S.height);
+    const names = { '210x297': 'A4', '148x210': 'A5', '182x257': 'B5', '257x364': 'B4', '216x279': 'Letter' };
+    const key = Math.min(w, h) + 'x' + Math.max(w, h);
+    const name = names[key] || `${w}×${h}mm`;
+    return name + (w > h ? ' 가로' : ' 세로');
+  }
+  function showError(err, name) {
+    const code = err && err.code;
+    let title = '이 파일은 열 수 없습니다';
+    let msg = (err && err.message) || '알 수 없는 문제로 문서를 읽지 못했습니다.';
+    if (code === 'HWP5') title = '구형 한글 파일(.hwp)입니다';
+    if (code === 'HWP5') msg = '이 뷰어는 .hwpx만 엽니다. 한글에서 [다른 이름으로 저장] → 파일 형식 HWPX로 저장한 뒤 다시 열어 주세요.';
+    if (code === 'NOT_ZIP' || code === 'BAD_ZIP') msg = 'hwpx 파일이 아니거나 내려받기가 덜 끝난 파일입니다. 파일을 다시 받은 뒤 열어 주세요.';
+    if (!code) msg = '문서 구조를 읽는 중에 문제가 생겼습니다. (' + msg + ')';
+    stage.innerHTML = `<section class="state-card" role="alert"><h2>${esc(title)}</h2><p>${esc(name || '')}</p><p>${esc(msg)}</p><div class="row"><button class="btn primary" type="button" data-act="open">다른 파일 열기</button><button class="btn" type="button" data-act="sample">예시 보고서 보기</button></div></section>`;
+    $('docTitle').textContent = 'HWPX 보고서 뷰어';
+    $('docSub').textContent = '파일을 열지 못했습니다';
+    state.doc = null;
+  }
+
+  // ------------------------------------------------------------------ 쪽 그리기
+  function imageUrl(id) {
+    const pkg = state.pkg;
+    if (!pkg) return null;
+    pkg.__urls = pkg.__urls || new Map();
+    if (pkg.__urls.has(id)) return pkg.__urls.get(id);
+    const b = pkg.bins.get(id);
+    if (!b) return null;
+    const url = URL.createObjectURL(new Blob([b.data], { type: b.type }));
+    pkg.__urls.set(id, url);
+    state.urls.push(url);
+    return url;
+  }
+  function renderDoc() {
+    const doc = state.doc;
+    stage.innerHTML = '';
+    if (state.sample) {
+      const n = document.createElement('div');
+      n.className = 'notice';
+      n.innerHTML = '<p><b>예시 보고서</b>를 보여 주고 있습니다. 보고서 스킬이 만든 .hwpx 파일을 열면 이 자리에 같은 모양으로 펼쳐집니다.</p><button class="btn primary" type="button" data-act="open">내 파일 열기</button>';
+      stage.appendChild(n);
+      state.noticeEl = n;
+    } else state.noticeEl = null;
+    state.maxW = Math.max(...doc.pages.map((p) => p.section.width));
+    state.pages = doc.pages.map((p) => {
+      const el = document.createElement('div');
+      el.className = 'page';
+      el.dataset.index = p.index;
+      el.style.aspectRatio = p.section.width + ' / ' + p.section.height;
+      try { el.innerHTML = HwpxEngine.renderPageSvg(doc, p, { imageUrl }); } catch (err) {
+        el.innerHTML = `<div style="padding:24px;color:#5A6375;font-size:13px">${p.index + 1}쪽을 그리지 못했습니다.</div>`;
+        if (window.console) console.warn(err);
+      }
+      stage.appendChild(el);
+      return el;
+    });
+    const saved = parseFloat(prefs.get('zoom'));
+    state.zoom = Number.isFinite(saved) && saved >= MIN_ZOOM && saved <= MAX_ZOOM ? saved : 1;
+    layoutPages();
+    state.current = 0;
+    updateSub();
+  }
+  function computeFit() {
+    const avail = viewer.clientWidth - 32;
+    state.fitW = Math.max(240, Math.min(avail, 900));
+  }
+  function layoutPages() {
+    computeFit();
+    const doc = state.doc;
+    if (!doc) return;
+    doc.pages.forEach((p, i) => {
+      const w = state.fitW * state.zoom * (p.section.width / state.maxW);
+      state.pages[i].style.width = w.toFixed(1) + 'px';
+    });
+    if (state.noticeEl) state.noticeEl.style.width = Math.min(state.fitW * Math.max(state.zoom, 1), state.fitW).toFixed(0) + 'px';
+    $('zoomFit').textContent = Math.abs(state.zoom - 1) < 0.001 ? '맞춤' : Math.round(state.zoom * 100) + '%';
+  }
+  function setZoom(z, anchor) {
+    z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+    const old = state.zoom;
+    if (Math.abs(z - old) < 1e-4) return;
+    const rect = viewer.getBoundingClientRect();
+    const ax = anchor ? anchor.x - rect.left : viewer.clientWidth / 2;
+    const ay = anchor ? anchor.y - rect.top : viewer.clientHeight / 2;
+    // 기준점 아래의 문서 위치를 쪽 기준으로 기억했다가 같은 자리로 되돌린다
+    const ref = pagePointAt(ax, ay);
+    state.zoom = z;
+    prefs.set('zoom', String(z));
+    layoutPages();
+    if (ref) {
+      const el = state.pages[ref.i];
+      viewer.scrollLeft = el.offsetLeft + ref.fx * el.offsetWidth - ax;
+      viewer.scrollTop = el.offsetTop + ref.fy * el.offsetHeight - ay;
+    }
+  }
+  function pagePointAt(ax, ay) {
+    const x = viewer.scrollLeft + ax, y = viewer.scrollTop + ay;
+    let best = null;
+    for (let i = 0; i < state.pages.length; i++) {
+      const el = state.pages[i];
+      if (y >= el.offsetTop - 7 && y <= el.offsetTop + el.offsetHeight + 7) {
+        best = { i, fx: (x - el.offsetLeft) / el.offsetWidth, fy: (y - el.offsetTop) / el.offsetHeight };
+        break;
+      }
+    }
+    if (!best && state.pages.length) {
+      const el = state.pages[state.current] || state.pages[0];
+      best = { i: state.pages.indexOf(el), fx: (x - el.offsetLeft) / el.offsetWidth, fy: (y - el.offsetTop) / el.offsetHeight };
+    }
+    return best;
+  }
+  function stepZoom(dir) {
+    const z = state.zoom;
+    let next = dir > 0 ? ZOOMS.find((v) => v > z + 0.01) : [...ZOOMS].reverse().find((v) => v < z - 0.01);
+    if (next === undefined) next = dir > 0 ? MAX_ZOOM : MIN_ZOOM;
+    setZoom(next);
+  }
+
+  // 지금 보고 있는 쪽
+  let rafScroll = 0;
+  viewer.addEventListener('scroll', () => {
+    if (rafScroll) return;
+    rafScroll = requestAnimationFrame(() => {
+      rafScroll = 0;
+      if (!state.pages.length) return;
+      const mid = viewer.scrollTop + viewer.clientHeight * 0.4;
+      let cur = 0;
+      for (let i = 0; i < state.pages.length; i++) if (state.pages[i].offsetTop <= mid) cur = i;
+      if (cur !== state.current) { state.current = cur; updateSub(); }
+    });
+  }, { passive: true });
+
+  // ------------------------------------------------------------------ 두 손가락 확대, 두 번 눌러 확대
+  let pinch = null, lastTap = 0, lastTapPos = null;
+  viewer.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2 && state.doc) {
+      const [a, b] = e.touches;
+      pinch = { d0: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), z0: state.zoom, cx: (a.clientX + b.clientX) / 2, cy: (a.clientY + b.clientY) / 2, scale: 1 };
+      const rect = viewer.getBoundingClientRect();
+      pinch.ox = viewer.scrollLeft + pinch.cx - rect.left;
+      pinch.oy = viewer.scrollTop + pinch.cy - rect.top;
+      stage.style.transformOrigin = pinch.ox + 'px ' + pinch.oy + 'px';
+    }
+  }, { passive: true });
+  viewer.addEventListener('touchmove', (e) => {
+    if (!pinch || e.touches.length !== 2) return;
+    e.preventDefault();
+    const [a, b] = e.touches;
+    const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinch.z0 * d / pinch.d0));
+    pinch.scale = z / pinch.z0;
+    stage.style.transform = `scale(${pinch.scale})`;
+  }, { passive: false });
+  const endPinch = () => {
+    if (!pinch) return;
+    const p = pinch;
+    pinch = null;
+    stage.style.transform = '';
+    stage.style.transformOrigin = '';
+    if (Math.abs(p.scale - 1) > 0.01) setZoom(p.z0 * p.scale, { x: p.cx, y: p.cy });
+  };
+  viewer.addEventListener('touchend', (e) => {
+    if (pinch && e.touches.length < 2) { endPinch(); return; }
+    if (e.changedTouches.length === 1 && e.touches.length === 0 && state.doc) {
+      const t = e.changedTouches[0];
+      const now = Date.now();
+      if (now - lastTap < 300 && lastTapPos && Math.hypot(t.clientX - lastTapPos.x, t.clientY - lastTapPos.y) < 30) {
+        e.preventDefault();
+        setZoom(state.zoom < 1.5 ? 2 : 1, { x: t.clientX, y: t.clientY });
+        lastTap = 0;
+      } else { lastTap = now; lastTapPos = { x: t.clientX, y: t.clientY }; }
+    }
+  });
+  viewer.addEventListener('touchcancel', endPinch);
+  viewer.addEventListener('wheel', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || !state.doc) return;
+    e.preventDefault();
+    setZoom(state.zoom * Math.exp(-e.deltaY * 0.0022), { x: e.clientX, y: e.clientY });
+  }, { passive: false });
+  viewer.addEventListener('dblclick', (e) => {
+    if (!state.doc || e.target.closest('button')) return;
+    setZoom(state.zoom < 1.5 ? 2 : 1, { x: e.clientX, y: e.clientY });
+  });
+
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (!state.doc) return;
+      const ref = pagePointAt(viewer.clientWidth / 2, 0);
+      layoutPages();
+      if (ref) {
+        const el = state.pages[ref.i];
+        viewer.scrollTop = el.offsetTop + ref.fy * el.offsetHeight;
+      }
+    }, 120);
+  });
+
+  // ------------------------------------------------------------------ 판(목차·문서함·정보)
+  let sheetReturn = null;
+  function openSheet(title, bodyHtml, onClick) {
+    closeSheet();
+    sheetReturn = document.activeElement;
+    overlay.innerHTML = `<div class="scrim" data-act="close"></div><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><header><h2 id="sheetTitle">${esc(title)}</h2><button class="icon-btn" type="button" data-act="close" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header><div class="body">${bodyHtml}</div></section>`;
+    overlay.onclick = (e) => {
+      const t = e.target.closest('[data-act]');
+      if (!t) return;
+      if (t.dataset.act === 'close') { closeSheet(); return; }
+      if (onClick) onClick(t, e);
+    };
+    const first = overlay.querySelector('.sheet button:not([data-act="close"])') || overlay.querySelector('.sheet button');
+    if (first) first.focus({ preventScroll: true });
+  }
+  function closeSheet() {
+    if (!overlay.innerHTML) return;
+    overlay.innerHTML = '';
+    overlay.onclick = null;
+    if (sheetReturn && sheetReturn.focus) sheetReturn.focus({ preventScroll: true });
+    sheetReturn = null;
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSheet();
+    if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) { e.preventDefault(); stepZoom(1); }
+    if ((e.ctrlKey || e.metaKey) && e.key === '-') { e.preventDefault(); stepZoom(-1); }
+    if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); setZoom(1); }
+  });
+
+  function showToc() {
+    const doc = state.doc;
+    if (!doc) { toast('먼저 문서를 열어 주세요.'); return; }
+    const items = doc.outline;
+    const body = items.length
+      ? `<ul class="list toc">${items.map((o, i) => `<li class="lv${Math.min(o.level, 2)}"><button type="button" data-act="go" data-i="${i}"><span class="t">${esc(o.text)}</span><span class="n">${o.page + 1}쪽</span></button></li>`).join('')}</ul>`
+      : '<p class="empty">이 문서에서 □ 소제목이나 I. II. 같은 대제목을 찾지 못했습니다.</p>';
+    const pages = `<div><h3>쪽으로 가기</h3><ul class="list">${doc.pages.map((p, i) => `<li><button type="button" data-act="page" data-i="${i}"><span class="t">${i + 1}쪽</span><span class="n">${p.pageNum ? '쪽 번호 ' + p.number : '쪽 번호 없음'}</span></button></li>`).join('')}</ul></div>`;
+    openSheet('목차', `<div>${body}</div>${doc.pages.length > 1 ? pages : ''}`, (t) => {
+      if (t.dataset.act === 'go') {
+        const o = items[+t.dataset.i];
+        closeSheet();
+        scrollToDoc(o.page, o.y);
+      } else if (t.dataset.act === 'page') {
+        closeSheet();
+        scrollToDoc(+t.dataset.i, null);
+      }
+    });
+  }
+  function scrollToDoc(pageIndex, y) {
+    const el = state.pages[pageIndex];
+    if (!el) return;
+    const p = state.doc.pages[pageIndex];
+    const scale = el.offsetWidth / p.section.width;
+    const bodyTop = p.section.margins.top + p.section.margins.header;
+    const off = y === null ? -14 : (bodyTop + y) * scale - 24;
+    viewer.scrollTop = el.offsetTop + off;
+  }
+
+  async function showLibrary() {
+    const recent = await store.list();
+    const rows = recent.map((r) => `<li class="doc-row"><button type="button" data-act="recent" data-id="${esc(r.id)}"><span class="t">${esc(r.name.replace(/\.hwpx$/i, ''))}<span class="meta">${dateText(r.openedAt)} · ${r.pages ? r.pages + '쪽 · ' : ''}${sizeText(r.size)}</span></span></button><button class="icon-btn" type="button" data-act="forget" data-id="${esc(r.id)}" aria-label="${esc(r.name)} 목록에서 지우기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></li>`).join('');
+    const samples = SAMPLES.map((s) => `<li><button type="button" data-act="sample" data-id="${s.id}"><span class="t">${esc(s.name.replace(/\.hwpx$/i, ''))}<span class="meta" style="display:block;color:var(--muted);font-size:12px;margin-top:2px">${esc(s.kind)}</span></span></button></li>`).join('');
+    openSheet('문서함', `
+      <div><button class="btn primary" type="button" data-act="open" style="width:100%">휴대폰이나 컴퓨터에서 .hwpx 파일 열기</button></div>
+      <div><h3>최근에 연 문서</h3>${recent.length ? `<ul class="list">${rows}</ul>` : '<p class="empty">아직 연 문서가 없습니다. 연 문서는 이 기기의 브라우저에만 남고 다른 곳으로 보내지 않습니다.</p>'}</div>
+      <div><h3>예시 보고서</h3><ul class="list">${samples}</ul></div>`, async (t) => {
+      if (t.dataset.act === 'open') { closeSheet(); pickFile(); }
+      else if (t.dataset.act === 'recent') {
+        const rec = await store.get(t.dataset.id);
+        closeSheet();
+        if (rec && rec.data) openBuffer(rec.data, { name: rec.name, id: rec.id });
+        else toast('저장해 둔 문서를 찾지 못했습니다. 파일을 다시 열어 주세요.');
+      } else if (t.dataset.act === 'forget') {
+        await store.remove(t.dataset.id);
+        if (prefs.get('last') === t.dataset.id) prefs.set('last', null);
+        showLibrary();
+      } else if (t.dataset.act === 'sample') {
+        closeSheet();
+        openSample(t.dataset.id);
+      }
+    });
+  }
+
+  function showInfo() {
+    const doc = state.doc;
+    if (!doc) { toast('먼저 문서를 열어 주세요.'); return; }
+    const p = doc.pages[0];
+    const mm = (v) => (v / 7200 * 25.4).toFixed(0);
+    const S = p.section;
+    const fonts = [...doc.fonts.keys()].filter(Boolean);
+    const rows = fonts.map((f) => {
+      const sub = HwpxEngine.fontFor(f)[3];
+      return `<tr><td>${esc(f)}</td><td class="arrow" aria-hidden="true">→</td><td>${esc(FONT_NAMES[sub] || sub)}</td></tr>`;
+    }).join('');
+    const warns = [...doc.warnings];
+    openSheet('문서 정보', `
+      <dl class="facts">
+        <dt>파일</dt><dd>${esc(state.name)}</dd>
+        <dt>쪽수</dt><dd>${doc.pages.length}쪽</dd>
+        <dt>용지</dt><dd>${paperName(S)} (${mm(S.width)}×${mm(S.height)}mm)</dd>
+        <dt>여백</dt><dd>위 ${mm(S.margins.top)} · 아래 ${mm(S.margins.bottom)} · 왼쪽 ${mm(S.margins.left)} · 오른쪽 ${mm(S.margins.right)}mm</dd>
+      </dl>
+      <div><h3>글꼴</h3><table class="fonts"><tbody>${rows || '<tr><td>글꼴 정보 없음</td></tr>'}</tbody></table></div>
+      <div><h3>이렇게 보여 줍니다</h3><p class="note">줄이 어디서 바뀌는지, 문단과 표가 몇 쪽에 놓이는지는 한컴 글꼴의 글자 폭 자료로 한글과 같은 규칙에 따라 계산합니다. 휴대폰에는 한컴 글꼴이 없어서 글자 모양만 위의 무료 글꼴로 대신 그립니다. 그래서 획 모양은 조금 달라도 줄 바꿈 위치와 들여쓰기는 한글 화면에 맞춥니다. 드물게 한 줄 정도 어긋날 수 있으니 결재 전 최종 확인은 한글 프로그램에서 해 주세요.</p></div>
+      ${warns.length ? `<div><h3>단순하게 그린 부분</h3><ul class="warn">${warns.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
+      <p class="note" style="font-size:12px">글자 폭 자료와 배치 규칙: python-hwpx 6.10.0(Apache License 2.0)에서 옮김. 글꼴: 나눔명조·나눔고딕(NHN)에서 필요한 글자만 담아 이름을 바꾼 판, 본고딕(Noto Sans KR), 모두 SIL OFL 1.1. 압축 풀기: JSZip(MIT). 파일은 이 기기 안에서만 읽고 어디로도 보내지 않습니다.</p>`);
+  }
+
+  function toast(msg) {
+    const old = document.querySelector('.toast');
+    if (old) old.remove();
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.setAttribute('role', 'status');
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2600);
+  }
+
+  // ------------------------------------------------------------------ 파일 고르기·끌어 놓기
+  const input = $('fileInput');
+  function pickFile() { input.value = ''; input.click(); }
+  input.addEventListener('change', async () => {
+    const f = input.files && input.files[0];
+    if (!f) return;
+    openFile(f);
+  });
+  async function openFile(f) {
+    try {
+      const buf = await f.arrayBuffer();
+      openBuffer(buf, { name: f.name || '문서.hwpx' });
+    } catch (e) {
+      showError({ message: '파일을 읽지 못했습니다. 다시 골라 주세요.', code: 'READ' }, f.name);
+    }
+  }
+  let dragDepth = 0;
+  window.addEventListener('dragenter', (e) => {
+    if (!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return;
+    e.preventDefault();
+    dragDepth++;
+    if (!document.querySelector('.drop')) {
+      const d = document.createElement('div');
+      d.className = 'drop';
+      d.textContent = '여기에 놓으면 문서를 엽니다';
+      document.body.appendChild(d);
+    }
+  });
+  window.addEventListener('dragover', (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+  window.addEventListener('dragleave', () => {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) { const d = document.querySelector('.drop'); if (d) d.remove(); }
+  });
+  window.addEventListener('drop', (e) => {
+    const d = document.querySelector('.drop');
+    if (d) d.remove();
+    dragDepth = 0;
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f) return;
+    e.preventDefault();
+    openFile(f);
+  });
+
+  async function openSample(id) {
+    const s = SAMPLES.find((x) => x.id === id) || SAMPLES[0];
+    try {
+      let b64 = s.inline;
+      if (!b64) {
+        showLoading(s.name);
+        const r = await fetch(s.url);
+        if (!r.ok) throw new Error('예시 문서를 불러오지 못했습니다');
+        b64 = (await r.json()).data;
+      }
+      await openBuffer(b64ToBuffer(b64), { name: s.name, sample: s.id });
+    } catch (e) {
+      showError({ message: '예시 문서를 불러오지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요.', code: 'SAMPLE' }, s.name);
+    }
+  }
+
+  // ------------------------------------------------------------------ 단추
+  $('openBtn').addEventListener('click', pickFile);
+  $('tocBtn').addEventListener('click', showToc);
+  $('libBtn').addEventListener('click', showLibrary);
+  $('infoBtn').addEventListener('click', showInfo);
+  $('zoomIn').addEventListener('click', () => stepZoom(1));
+  $('zoomOut').addEventListener('click', () => stepZoom(-1));
+  $('zoomFit').addEventListener('click', () => setZoom(1));
+  stage.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-act]');
+    if (!t) return;
+    if (t.dataset.act === 'open') pickFile();
+    if (t.dataset.act === 'sample') openSample('sample-review');
+  });
+
+  // ------------------------------------------------------------------ 시작: 마지막에 본 문서, 없으면 예시
+  window.HwpxViewer = { openFile, openBuffer, toast, hasDoc: () => !!state.doc };
+  (async function start() {
+    // 설치형 앱은 공유받은 파일 등을 먼저 연다(HWPX_BOOT가 true를 돌려주면 끝)
+    try { if (window.HWPX_BOOT && (await window.HWPX_BOOT(window.HwpxViewer))) return; } catch (e) { /* 그냥 시작 */ }
+    const last = prefs.get('last');
+    if (last && !last.startsWith('sample-')) {
+      const rec = await store.get(last);
+      if (rec && rec.data) { await openBuffer(rec.data, { name: rec.name, id: rec.id }); if (state.doc) return; }
+    }
+    await openSample(last && last.startsWith('sample-') ? last : 'sample-review');
+  })();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { /* 글꼴이 들어오면 SVG 글자가 저절로 바뀐다 */ });
+})();
+</script>
+</body>
+</html>

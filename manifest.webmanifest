@@ -1,0 +1,80 @@
+{
+  "id": "./",
+  "name": "HWPX 보고서 뷰어",
+  "short_name": "HWPX 뷰어",
+  "description": "한글(.hwpx) 보고서를 한글 프로그램과 같은 줄 배치로 보는 뷰어",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FAFBFD",
+  "theme_color": "#FAFBFD",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "share_target": {
+    "action": "./share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "file",
+          "accept": [
+            "application/vnd.hancom.hwpx",
+            "application/haansofthwpx",
+            "application/hwp+zip",
+            "application/x-hwpx",
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/octet-stream",
+            ".hwpx"
+          ]
+        }
+      ]
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "./",
+      "accept": {
+        "application/vnd.hancom.hwpx": [
+          ".hwpx"
+        ],
+        "application/haansofthwpx": [
+          ".hwpx"
+        ],
+        "application/hwp+zip": [
+          ".hwpx"
+        ],
+        "application/x-hwpx": [
+          ".hwpx"
+        ]
+      }
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
+}
